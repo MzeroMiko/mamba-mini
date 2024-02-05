@@ -8,7 +8,7 @@ an efficient implementation of selective scan in one file, works with both cpu a
 ```python
 import torch
 
-def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, chunksize=11111111):
+def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, chunksize=64):
     """
     # B: batch_size, G: groups, D: dim, N: state dim, L: seqlen
     us: B, G * D, L 
@@ -18,6 +18,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     Cs: B, G, N, L
     Ds: G * D
     delta_bias: G * D
+    # chunksize can be any as you like. But as the chunksize raises, hs may get None, as exp(sum(delta) A) is really small
     """
     def selective_scan_chunk(us, dts, As, Bs, Cs, Ds, hprefix):
         """
