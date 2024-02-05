@@ -4,8 +4,6 @@ import math
 import torch
 import torch.nn.functional as F
 import pytest
-
-from torch.cuda.amp import custom_bwd, custom_fwd
 from einops import rearrange, repeat
 
 
@@ -38,8 +36,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
         hprefix: (1, B, G, D, N)
         """
         
-        ts = dts.cumsum(dim=0)
-        Ats = torch.einsum("gdn,lbgd->lbgdn", As, ts).exp()
+        Ats = torch.einsum("gdn,lbgd->lbgdn", As, dts.cumsum(dim=0)).exp()
         dtBus = torch.einsum("lbgd,lbgn,lbgd->lbgdn", dts, Bs, us)
         hs = (dtBus / Ats).cumsum(dim=0)
         hs = hs + hprefix.unsqueeze(0)
@@ -132,15 +129,14 @@ def selective_scan_ref(u, delta, A, B, C, D=None, delta_bias=None, delta_softplu
 @pytest.mark.parametrize('wtype', [torch.float32])
 # @pytest.mark.parametrize('itype', [torch.float32, torch.float16, torch.bfloat16])
 @pytest.mark.parametrize('itype', [torch.float32])
-# @pytest.mark.parametrize('seqlen', [256, 512, 1024, 2048, 4096])
-@pytest.mark.parametrize('seqlen', [10])
+@pytest.mark.parametrize('seqlen', [256, 512, 1024, 2048, 4096])
 @pytest.mark.parametrize('has_delta_bias', [False, True])
 # @pytest.mark.parametrize('has_delta_bias', [True])
 # @pytest.mark.parametrize('delta_softplus', [False, True])
 @pytest.mark.parametrize('delta_softplus', [True])
 @pytest.mark.parametrize('has_D', [False, True])
 @pytest.mark.parametrize("varBC_groups", [1, 2])
-@pytest.mark.parametrize("chunksize", [1])
+@pytest.mark.parametrize("chunksize", [64])
 def test_selective_scan(varBC_groups, has_D, has_delta_bias,
                         delta_softplus, seqlen, itype, wtype, chunksize):
     device = 'cuda'
@@ -187,7 +183,7 @@ def test_selective_scan(varBC_groups, has_D, has_delta_bias,
         u, delta, A, B, C, D,
         delta_bias=delta_bias, delta_softplus=delta_softplus, chunksize=chunksize,
     )
-    out_ref, *rest = selective_scan_ref(
+    out_ref = selective_scan_ref(
         u_ref, delta_ref, A_ref, B_ref, C_ref, D_ref,
         delta_bias=delta_bias_ref, delta_softplus=delta_softplus,
     )
