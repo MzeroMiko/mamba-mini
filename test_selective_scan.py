@@ -7,7 +7,7 @@ import pytest
 from einops import rearrange, repeat
 
 
-def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, chunksize=11111111):
+def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, chunksize=64):
     """
     # B: batch_size, G: groups, D: dim, N: state dim, L: seqlen
     us: B, G * D, L 
@@ -17,6 +17,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     Cs: B, G, N, L
     Ds: G * D
     delta_bias: G * D
+    # chunksize can be any as you like. But as the chunksize raises, hs may get None, as exp(sum(delta) A) is really small
     """
     def selective_scan_chunk(us, dts, As, Bs, Cs, Ds, hprefix):
         """
@@ -38,9 +39,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
         
         Ats = torch.einsum("gdn,lbgd->lbgdn", As, dts.cumsum(dim=0)).exp()
         dtBus = torch.einsum("lbgd,lbgn,lbgd->lbgdn", dts, Bs, us)
-        hs = (dtBus / Ats).cumsum(dim=0)
-        hs = hs + hprefix.unsqueeze(0)
-        hs = hs * Ats
+        hs = Ats * (dtBus / Ats).cumsum(dim=0) + Ats * hprefix.unsqueeze(0)
         ys = torch.einsum("lbgn,lbgdn->lbgd", Cs, hs) 
         if Ds is not None:
             ys = ys + Ds * us
@@ -131,8 +130,6 @@ def selective_scan_ref(u, delta, A, B, C, D=None, delta_bias=None, delta_softplu
 @pytest.mark.parametrize('itype', [torch.float32])
 @pytest.mark.parametrize('seqlen', [256, 512, 1024, 2048, 4096])
 @pytest.mark.parametrize('has_delta_bias', [False, True])
-# @pytest.mark.parametrize('has_delta_bias', [True])
-# @pytest.mark.parametrize('delta_softplus', [False, True])
 @pytest.mark.parametrize('delta_softplus', [True])
 @pytest.mark.parametrize('has_D', [False, True])
 @pytest.mark.parametrize("varBC_groups", [1, 2])

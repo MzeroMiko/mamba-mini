@@ -40,9 +40,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
         
         Ats = torch.einsum("gdn,lbgd->lbgdn", As, dts.cumsum(dim=0)).exp()
         dtBus = torch.einsum("lbgd,lbgn,lbgd->lbgdn", dts, Bs, us)
-        hs = (dtBus / Ats).cumsum(dim=0)
-        hs = hs + hprefix.unsqueeze(0)
-        hs = hs * Ats
+        hs = Ats * (dtBus / Ats).cumsum(dim=0) + Ats * hprefix.unsqueeze(0)
         ys = torch.einsum("lbgn,lbgdn->lbgd", Cs, hs) 
         if Ds is not None:
             ys = ys + Ds * us
