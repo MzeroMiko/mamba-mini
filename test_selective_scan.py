@@ -73,7 +73,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     oys = []
     # ohs = []
     hprefix = us.new_zeros((B, G, D, N), dtype=torch.float)
-    for i in range(0, L - 1, chunksize):
+    for i in range(0, L, chunksize):
         ys, hs = selective_scan_chunk(
             us[i:i + chunksize], dts[i:i + chunksize], 
             As, Bs[i:i + chunksize], Cs[i:i + chunksize], hprefix, 
