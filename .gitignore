@@ -1,3 +1,4 @@
 *.pytest_cache
 __pycache__
 test_selective_scan_test.py
+.test_selective_scan.py
