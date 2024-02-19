@@ -7,8 +7,7 @@ an efficient implementation of selective scan in one file, works with both cpu a
 ### code
 ```python
 import torch
-
-def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, chunksize=64):
+def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, return_last_state=False, chunksize=64):
     """
     # B: batch_size, G: groups, D: dim, N: state dim, L: seqlen
     us: B, G * D, L 
@@ -20,7 +19,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     delta_bias: G * D
     # chunksize can be any as you like. But as the chunksize raises, hs may get None, as exp(sum(delta) A) is really small
     """
-    def selective_scan_chunk(us, dts, As, Bs, Cs, Ds, hprefix):
+    def selective_scan_chunk(us, dts, As, Bs, Cs, hprefix):
         """
         partial(h) / partial(t) = Ah + Bu; y = Ch + Du;
         => partial(h*exp(-At)) / partial(t) = Bu*exp(-At);
@@ -29,23 +28,26 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
            y_i = C_i*h_i + D*u_i
         """
         """
-        us: (L, B, G, D) # L is chunk_size
-        dts: (L, B, G, D)
+        us, dts: (L, B, G, D) # L is chunk_size
         As: (G, D, N)
-        Bs: (L, B, G, N)
-        Cs: (L, B, G, N)
+        Bs, Cs: (L, B, G, N)
         Ds: (G, D)
-        hprefix: (1, B, G, D, N)
+        hprefix: (B, G, D, N)
         """
-        
-        Ats = torch.einsum("gdn,lbgd->lbgdn", As, dts.cumsum(dim=0)).exp()
-        dtBus = torch.einsum("lbgd,lbgn,lbgd->lbgdn", dts, Bs, us)
-        hs = Ats * (dtBus / Ats).cumsum(dim=0) + Ats * hprefix.unsqueeze(0)
+        ts = dts.cumsum(dim=0)
+        Ats = torch.einsum("gdn,lbgd->lbgdn", As, ts).exp()
+        scale = Ats[-1].detach()
+        rAts = Ats / scale
+        duts = dts * us
+        dtBus = torch.einsum("lbgd,lbgn->lbgdn", duts, Bs)
+        hs_tmp = rAts * (dtBus / rAts).cumsum(dim=0) 
+        hs = hs_tmp + Ats * hprefix.unsqueeze(0)
         ys = torch.einsum("lbgn,lbgdn->lbgd", Cs, hs) 
-        if Ds is not None:
-            ys = ys + Ds * us
-        return ys, hs[-1]
+        return ys, hs
     
+    inp_dtype = us.dtype
+    has_D = Ds is not None
+
     dts = dts.float()
     if delta_bias is not None:
         dts = dts + delta_bias.view(1, -1, 1).float()
@@ -62,19 +64,29 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     As = As.view(G, -1, N).float()
     Bs = Bs.permute(3, 0, 1, 2).float()
     Cs = Cs.permute(3, 0, 1, 2).float()
-    Ds = Ds.view(G, -1).float() if Ds is not None else None
+    Ds = Ds.view(G, -1).float() if has_D else None
     D = As.shape[1]
     
     oys = []
+    # ohs = []
     hprefix = us.new_zeros((B, G, D, N), dtype=torch.float)
-    for i in range(0, L, chunksize):
-        ys, hprefix = selective_scan_chunk(
+    for i in range(0, L - 1, chunksize):
+        ys, hs = selective_scan_chunk(
             us[i:i + chunksize], dts[i:i + chunksize], 
-            As, Bs[i:i + chunksize], Cs[i:i + chunksize], Ds, hprefix, 
+            As, Bs[i:i + chunksize], Cs[i:i + chunksize], hprefix, 
         )
         oys.append(ys)
+        # ohs.append(hs)
+        hprefix = hs[-1]
 
-    oys = torch.cat(oys, dim=0).permute(1, 2, 3, 0).view(B, -1, L)
-    return oys
+    oys = torch.cat(oys, dim=0)
+    # ohs = torch.cat(ohs, dim=0)
+    if has_D:
+        oys = oys + Ds * us
+    oys = oys.permute(1, 2, 3, 0).view(B, -1, L)
+    oys = oys.to(inp_dtype)
+    # hprefix = hprefix.to(inp_dtype)
+
+    return oys if not return_last_state else (oys, hprefix.view(B, G * D, N))
 
 ```
