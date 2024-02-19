@@ -90,3 +90,8 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     return oys if not return_last_state else (oys, hprefix.view(B, G * D, N))
 
 ```
+
+### to test
+```bash
+pytest test_selective_scan.py
+```

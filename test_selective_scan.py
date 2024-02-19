@@ -8,7 +8,7 @@ import pytest
 from einops import rearrange, repeat
 
 MODE = "v0"
-MODE = "fn"
+# MODE = "fn"
 # MODE = "fnDEBUG"
 
 def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, return_last_state=False, chunksize=64):
