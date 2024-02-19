@@ -48,6 +48,8 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
     
     inp_dtype = us.dtype
     has_D = Ds is not None
+    if chunksize < 1:
+        chunksize = Bs.shape[-1]
 
     dts = dts.float()
     if delta_bias is not None:
@@ -92,7 +94,7 @@ def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus
 
 
 # api to fit original mamba_ssm
-def build_apt_selective_scan(chunksize=64, mode="v0"):
+def build_api_selective_scan(chunksize=64, mode="v0"):
     def selective_scan_fn(u, delta, A, B, C, D, z=None,
         delta_bias=None, delta_softplus=None,
         return_last_state=False):
