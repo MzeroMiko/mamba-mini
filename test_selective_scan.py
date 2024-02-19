@@ -190,7 +190,7 @@ def selective_scan_ref(u, delta, A, B, C, D=None, z=None, delta_bias=None, delta
 @pytest.mark.parametrize("chunksize", [64])
 def test_selective_scan(is_variable_B, is_variable_C, varBC_groups, has_D, has_z, has_delta_bias,
                         delta_softplus, return_last_state, seqlen, itype, wtype, chunksize):
-    selective_scan_fn = build_apt_selective_scan(chunksize=chunksize)
+    selective_scan_fn = build_api_selective_scan(chunksize=chunksize)
 
     if varBC_groups > 1 and (not is_variable_B or not is_variable_C):
         pytest.skip()  # This config is not applicable
