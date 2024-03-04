@@ -1,10 +1,22 @@
 # mamba-mini
 An efficient implementation of selective scan in one file, works with both cpu and gpu, with corresponding mathematical derivation. It is probably the code which is the most close to selective_scan_cuda in mamba.
 
-### mathematical derivation
+### update!
+* **`20240304: New implementation with new derivations!`** we now support a new approach to implement selective_scan chunk-parallely: [`selective_scan_easyv3`](./test_selective_scan_easy.py). It is faster than `selective_scan_easy` when `d_state=1`, but still slower than `mamba_ssm` with cuda. We would implement it in `triton` and test the speed in the future. 
+
+### mathematical derivation to `chunk-naive version`
+code is in [`selective_scan_easy`](./test_selective_scan_easy.py) and [`SelectiveScanEasy`](./test_selective_scan_easy.py).
 ![image](./assets/derivation.png)
 
-### code
+### mathematical derivation to `chunk-parallel version`
+This is the chunk parallel version of selective scan, with support to some different branches.
+code is in [`selective_scan_easyv3`](./test_selective_scan_easy.py).
+![image](./assets/derivation_general.png)
+![image](./assets/derivation_wdk.png)
+![image](./assets/derivation_wdv.png)
+![image](./assets/derivation_dk1.png)
+
+### naive code
 ```python
 import torch
 def selective_scan_easy(us, dts, As, Bs, Cs, Ds, delta_bias=None, delta_softplus=False, return_last_state=False, chunksize=64):
